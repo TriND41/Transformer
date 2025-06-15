@@ -15,7 +15,7 @@ class Decoder(nn.Module):
             for _ in range(n_blocks)
         ])
 
-    def forward(self, x: torch.Tensor, context: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, context_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, List[torch.Tensor]]]:        
+    def forward(self, x: torch.Tensor, context: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, context_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]], Optional[List[torch.Tensor]]]:
         x = self.embedding(x)
         x += self.pe(x)
 
@@ -39,6 +39,7 @@ class Decoder(nn.Module):
             cross_weights.append(block_cross_weights)
         
         if not get_weights:
-            return x
-        else:
-            return x, masked_weights, cross_weights
+            masked_weights = None
+            cross_weights = None
+
+        return x, masked_weights, cross_weights

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from model.modules.encoder import Encoder
 from model.modules.decoder import Decoder
-from typing import Optional
+from typing import Optional, Tuple, List
 
 class Transformer(nn.Module):
     def __init__(
@@ -45,9 +45,17 @@ class Transformer(nn.Module):
         )
         self.proj = nn.Linear(in_features=d_model, out_features=n_decoder_tokens, bias=out_proj_bias)
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor, x_mask: Optional[torch.Tensor] = None, y_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        x_mask: Optional[torch.Tensor] = None,
+        y_mask: Optional[torch.Tensor] = None,
+        get_weights: bool = False
+    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]], Optional[List[torch.Tensor]], Optional[List[torch.Tensor]]]:
         # Encoder Handling
-        x = self.encoder(x, x_mask, get_weights=get_weights)
+        x, encoder_weights = self.encoder(x, x_mask, get_weights=get_weights)
         # Decoder Handling
-        y = self.decoder(y, x, x_mask, y_mask, get_weights=get_weights)
-        return y
+        y, decoder_masked_weights, decoder_cross_weights = self.decoder(y, x, x_mask, y_mask, get_weights=get_weights)
+
+        return y, encoder_weights, decoder_masked_weights, decoder_cross_weights

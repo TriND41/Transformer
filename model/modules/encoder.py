@@ -14,7 +14,7 @@ class Encoder(nn.Module):
             for _ in range(n_blocks)
         ])
 
-    def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, List[torch.Tensor]]]:
+    def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:
         x = self.embedding(x)
         x += self.pe(x)
 
@@ -25,7 +25,4 @@ class Encoder(nn.Module):
             x, block_weights = block(x, attn_mask, get_weights=get_weights)
             weights.append(block_weights)
 
-        if not get_weights:
-            return x
-        else:
-            return x, weights
+        return x, None if not get_weights else weights
