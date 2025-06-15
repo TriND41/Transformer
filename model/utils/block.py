@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from model.utils.attention import MultiHeadAttention
 from model.utils.ffn import FeedForward
-from typing import Optional, Union, Tuple
+from typing import Optional, Tuple
 
 class EncoderBlock(nn.Module):
     def __init__(self, d_model: int, n_heads: int, dropout_p: float, ffn_n_factors: int = 4, attn_bias: bool = True, ffn_bias: bool = True, eps: float = 1e-5) -> None:

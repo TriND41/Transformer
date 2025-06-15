@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 class FeedForward(nn.Module):
     def __init__(self, d_model: int, n_factors: int = 4, bias: bool = True) -> None:
