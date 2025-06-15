@@ -57,4 +57,6 @@ class Transformer(nn.Module):
         x, encoder_weights = self.encoder(x, x_mask, get_weights=get_weights)
         # Decoder Handling
         y, decoder_masked_weights, decoder_cross_weights = self.decoder(y, x, x_mask, y_mask, get_weights=get_weights)
+        # Projection
+        y = self.proj(y)
         return y, encoder_weights, decoder_masked_weights, decoder_cross_weights

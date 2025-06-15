@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from model.utils.attention import MultiHeadAttention
 from model.utils.ffn import FeedForward
-from typing import Optional, Tuple
+from typing import Optional, Union, Tuple
 
 class EncoderBlock(nn.Module):
     def __init__(self, d_model: int, n_heads: int, dropout_p: float, ffn_n_factors: int = 4, attn_bias: bool = True, ffn_bias: bool = True, eps: float = 1e-5) -> None:
@@ -58,4 +58,4 @@ class DecoderBlock(nn.Module):
         ffn = self.ffn(cross_attn)
         ffn = self.ffn_norm(self.dropout(ffn) + cross_attn)
 
-        ffn, masked_weights, cross_weights
+        return ffn, masked_weights, cross_weights
