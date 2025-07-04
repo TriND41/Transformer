@@ -5,7 +5,7 @@ from torch.nn import Module
 from torch.optim import Optimizer
 
 from utils.dictionaries import CheckpointKey
-from utils.constants import CHECKPOINT_EXTENSION
+from handlers.constants import CHECKPOINT_EXTENSION
 
 from collections import OrderedDict
 from typing import Dict, Union, Any
