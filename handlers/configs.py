@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Dict, Any
 
 @dataclass
 class TransformerConfig:
@@ -15,16 +14,10 @@ class TransformerConfig:
     ffn_bias: bool = True
     eps: float = 1e-5
 
-    def update(self, configs: Dict[str, Any]) -> None:
-        self.__dict__.update(configs)
+@dataclass
+class SrcTextProcessorConfig:
+    tokenizer_path: str
 
 @dataclass
-class ProcessorConfig:
-    encoder_tokenizer_path: str
-    decoder_tokenizer_path: str
-    start_token: str = "<BOS>"
-    end_token: str = "<EOS>"
-    unk_token: str = "<UNK>"
-
-    def update(self, configs: Dict[str, Any]) -> None:
-        self.__dict__.update(configs)
+class DstTextProcessorConfig:
+    tokenizer_path: str

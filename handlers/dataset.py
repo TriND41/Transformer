@@ -1,28 +1,39 @@
 import os
-import torch
+import numpy as np
 from torch.utils.data import Dataset
+from resolvers.processing import TextProcessor
+from handlers.symbols import MachineTranslationManifestKey as ManifestKey
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
-import pyarrow.csv as csv
-from typing import Union, Optional, List, Tuple
+from typing import Optional, List, Tuple
 
-class TransformerDataset(Dataset):
-    def __init__(self, manifest: Union[str, pd.DataFrame, pa.Table], num_examples: Optional[int] = None) -> None:
+class MachineTranslationDataset(Dataset):
+    def __init__(self, manifest: str, src_text_processor: TextProcessor, dst_text_processor: TextProcessor, num_examples: Optional[int] = None) -> None:
         super().__init__()
-        if isinstance(manifest, str):
-            if '.parquet' in manifest:
-                self.table = pq.read_table(manifest)
-            elif '.csv' in manifest:
-                self.table = csv.read_csv(manifest)
-            elif '.tsv' in manifest:
-                self.table = pa.Table.from_pandas(pd.read_csv(manifest, sep="\t"))
-            else:
-                raise("Invalid Manifest Format to read")
-        elif isinstance(manifest, pd.DataFrame):
-            self.table = pa.Table.from_pandas(manifest)
-        else:
-            self.table = manifest
-
+        assert os.path.exists(manifest)
+        self.table = pd.read_csv(manifest)
         if num_examples is not None:
-            self.table = self.table.slice(0, num_examples)
+            self.table = self.table[:num_examples]
+
+        self.src_text_processor = src_text_processor
+        self.dst_text_processor = dst_text_processor
+
+    def __len__(self) -> int:
+        return len(self.table)
+    
+    def __getitem__(self, index: int) -> Tuple[str, str]:
+        index_df = self.table.iloc[index]
+
+        src_text = index_df[ManifestKey.SRC]
+        dst_text = index_df[ManifestKey.DST]
+
+        return src_text, dst_text
+    
+    def collate(self, batch: List[Tuple[str, str]]) -> Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
+        src_texts, dst_texts = zip(*batch)
+
+        src_ids, src_lengths = self.src_text_processor(src_texts)
+        dst_ids, dst_lengths = self.dst_text_processor(dst_texts)
+
+        targets = dst_ids[1:]
+
+        return (src_ids, dst_ids, src_lengths, dst_lengths), targets
