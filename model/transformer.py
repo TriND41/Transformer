@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from model.modules.encoder import Encoder
 from model.modules.decoder import Decoder
-from typing import Optional, Tuple, List
+from typing import Optional
 
 class Transformer(nn.Module):
     def __init__(
