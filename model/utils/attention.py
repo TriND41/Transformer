@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from model.utils.common import get_eps
-from typing import Optional, Union, Tuple
+from typing import Optional
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_model: int, n_heads: int, dropout_p: float = 0.0, bias: bool = True) -> None:
@@ -11,7 +11,7 @@ class MultiHeadAttention(nn.Module):
         self.d_model = d_model
         self.n_heads = n_heads
         self.head_dim = d_model // n_heads
-        self.sqrt_dim = math.sqrt(self.head_dim)
+        self.scale_factor = 1.0 / math.sqrt(self.head_dim)
 
         # QKV Projection Layers
         self.q_proj = nn.Linear(in_features=d_model, out_features=d_model, bias=bias)
@@ -24,30 +24,28 @@ class MultiHeadAttention(nn.Module):
         # Output Projection Layer
         self.out_proj = nn.Linear(in_features=d_model, out_features=d_model, bias=bias)
 
-    def scaled_dot_product_attention(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        # Q x K^T
-        attn = torch.matmul(q, k.transpose(2, 3))
-
-        # Scale
-        attn /= self.sqrt_dim
+    def scaled_dot_product_attention(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        attn_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        # Q x K^T / sqrt(dk)
+        attn_scores = torch.matmul(q, k.transpose(2, 3)) * self.scale_factor
 
         # (Optional) Mask
         if attn_mask is not None:
-            attn.masked_fill_(attn_mask, get_eps(attn))
+            attn_scores.masked_fill_(attn_mask, get_eps(attn_scores))
 
         # Softmax
-        weights = F.softmax(attn, dim=3)
-        weights = self.dropout(weights)
+        attn_weights = F.softmax(attn_scores, dim=3)
+        attn_weights = self.dropout(attn_weights)
 
         # Compute Attention Weights
-        attn = torch.matmul(weights, v)
+        return torch.matmul(attn_weights, v)
         
-        if not get_weights:
-            return attn
-        else:
-            return attn, weights
-        
-    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size, query_length, _ = q.size()
         cross_length = k.size(1)
         
@@ -62,14 +60,8 @@ class MultiHeadAttention(nn.Module):
         v = v.view([batch_size, cross_length, self.n_heads, self.head_dim]).transpose(1, 2)
 
         # Compute attention
-        weights = None
-        if not get_weights:
-            attn = self.scaled_dot_product_attention(q, k, v, attn_mask, get_weights=get_weights)
-        else:
-            attn, weights = self.scaled_dot_product_attention(q, k, v, attn_mask, get_weights=get_weights)
-
-        # Attention Projection
+        attn = self.scaled_dot_product_attention(q, k, v, attn_mask)
         attn = attn.transpose(1, 2).contiguous().view([batch_size, query_length, self.d_model])
         attn = self.out_proj(attn)
 
-        return attn, weights
+        return attn

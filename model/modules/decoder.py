@@ -3,7 +3,7 @@ import torch.nn as nn
 from model.utils.block import DecoderBlock
 from model.utils.position import PositionalEncoding
 from model.utils.common import extend_look_ahead_mask
-from typing import Optional, Union, List, Tuple
+from typing import Optional
 
 class Decoder(nn.Module):
     def __init__(self, n_tokens: int, n_blocks: int, d_model: int, n_heads: int, dropout_p: float, ffn_n_factors: int = 4, attn_bias: bool = True, ffn_bias: bool = True, eps: float = 1e-5) -> None:
@@ -15,12 +15,11 @@ class Decoder(nn.Module):
             for _ in range(n_blocks)
         ])
 
-    def forward(self, x: torch.Tensor, context: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, context_mask: Optional[torch.Tensor] = None, get_weights: bool = False) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]], Optional[List[torch.Tensor]]]:
+    def forward(self, x: torch.Tensor, context: torch.Tensor, attn_mask: Optional[torch.Tensor] = None, context_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        batch_size, length = x.size()
+
         x = self.embedding(x)
         x += self.pe(x)
-
-        masked_weights = []
-        cross_weights = []
 
         if attn_mask is not None and context_mask is not None:
             attn_length = attn_mask.size(1)
@@ -32,14 +31,14 @@ class Decoder(nn.Module):
             ).logical_not()
 
             attn_mask = extend_look_ahead_mask(attn_mask).unsqueeze(1).logical_not()
+        elif attn_mask is not None:
+            attn_mask = extend_look_ahead_mask(attn_mask).unsqueeze(1).logical_not()
+        else:
+            attn_mask = extend_look_ahead_mask(
+                torch.ones([batch_size, length], dtype=torch.bool, device=x.device)
+            )
 
         for block in self.blocks:
-            x, block_masked_weights, block_cross_weights = block(x, context, attn_mask, context_mask, get_weights=get_weights)
-            masked_weights.append(block_masked_weights)
-            cross_weights.append(block_cross_weights)
-        
-        if not get_weights:
-            masked_weights = None
-            cross_weights = None
+            x = block(x, context, attn_mask, context_mask)
 
-        return x, masked_weights, cross_weights
+        return x

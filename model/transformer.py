@@ -50,13 +50,12 @@ class Transformer(nn.Module):
         x: torch.Tensor,
         y: torch.Tensor,
         x_mask: Optional[torch.Tensor] = None,
-        y_mask: Optional[torch.Tensor] = None,
-        get_weights: bool = False
-    ) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]], Optional[List[torch.Tensor]], Optional[List[torch.Tensor]]]:
+        y_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         # Encoder Handling
-        x, encoder_weights = self.encoder(x, x_mask, get_weights=get_weights)
+        x = self.encoder(x, x_mask)
         # Decoder Handling
-        y, decoder_masked_weights, decoder_cross_weights = self.decoder(y, x, x_mask, y_mask, get_weights=get_weights)
+        y = self.decoder(y, x, x_mask, y_mask)
         # Projection
         y = self.proj(y)
-        return y, encoder_weights, decoder_masked_weights, decoder_cross_weights
+        return y
