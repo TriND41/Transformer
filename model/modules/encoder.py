@@ -17,12 +17,11 @@ class Encoder(nn.Module):
     def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:
         x = self.embedding(x)
         x += self.pe(x)
-
-        weights = []
+        
         if attn_mask is not None:
             attn_mask.unsqueeze_(1).unsqueeze_(2).logical_not_()
+        
         for block in self.blocks:
-            x, block_weights = block(x, attn_mask)
-            weights.append(block_weights)
+            x = block(x, attn_mask)
 
         return x
