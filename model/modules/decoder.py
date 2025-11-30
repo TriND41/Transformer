@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from model.utils.block import DecoderBlock
 from model.utils.position import PositionalEncoding
-from model.utils.common import extend_look_ahead_mask
+from model.utils.masking import extend_look_ahead_mask
 from typing import Optional
 
 class Decoder(nn.Module):

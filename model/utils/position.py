@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Optional
+from typing import Optional, Union
 
 class PositionalEncoding(nn.Module):
     def __init__(self, embedding_dim: int, max_positions: Optional[int] = None) -> None:
@@ -12,7 +12,7 @@ class PositionalEncoding(nn.Module):
             pe = self.__encode(max_positions)
         self.register_buffer('pe', pe)
 
-    def __encode(self, length: int, device: str = 'cpu') -> torch.Tensor:
+    def __encode(self, length: int, device: Union[str, int] = 'cpu') -> torch.Tensor:
         div_term = torch.arange(0, self.embedding_dim, 2, device=device).unsqueeze(0)
         positions = torch.arange(length, dtype=div_term.dtype, device=device).unsqueeze(1)
         angles = torch.matmul(positions, div_term)
@@ -26,6 +26,5 @@ class PositionalEncoding(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         length = x.size(1)
         if self.pe.numel() == 0 or length > self.pe.size(0):
-            pe = self.__encode(length, device=x.device)
-            self.pe = pe
+            self.pe = self.__encode(length, device=x.device)
         return self.pe[:length].unsqueeze(dim=0)
