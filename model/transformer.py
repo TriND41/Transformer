@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from model.modules.encoder import Encoder
 from model.modules.decoder import Decoder
+from model.utils.masking import generate_padding_mask
 from typing import Optional
 
 class Transformer(nn.Module):
@@ -49,9 +50,18 @@ class Transformer(nn.Module):
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-        x_mask: Optional[torch.Tensor] = None,
-        y_mask: Optional[torch.Tensor] = None
+        x_lengths: Optional[torch.Tensor] = None,
+        y_lengths: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
+        x_mask: Optional[torch.Tensor] = None
+        y_mask: Optional[torch.Tensor] = None
+
+        if x_lengths is not None:
+            x_mask = generate_padding_mask(x_lengths)
+
+        if y_lengths is not None:
+            y_mask = generate_padding_mask(y_lengths)
+
         # Encoder Handling
         x = self.encoder(x, x_mask)
         # Decoder Handling

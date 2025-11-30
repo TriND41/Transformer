@@ -2,8 +2,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from model.utils.common import get_eps
 from typing import Optional
+
+def get_eps(
+    x: torch.Tensor,
+    eps16: float = torch.finfo(torch.float16).min,
+    eps32: float = torch.finfo(torch.float32).min,
+    eps64: float = torch.finfo(torch.float64).min
+) -> float:
+    if x.dtype == torch.float16:
+        return eps16
+    elif x.dtype == torch.float32:
+        return eps32
+    elif x.dtype == torch.float64:
+        return eps64
+    else:
+        return -float('inf')
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_model: int, n_heads: int, dropout_p: float = 0.0, bias: bool = True) -> None:
