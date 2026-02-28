@@ -7,3 +7,5 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, RandomSampler, DistributedSampler
 
 from model.transformer import Transformer
+from model.utils.masking import generate_padding_mask
+

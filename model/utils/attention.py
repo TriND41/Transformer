@@ -20,11 +20,11 @@ def get_eps(
         return -float('inf')
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, dropout_p: float = 0.0, bias: bool = True) -> None:
+    def __init__(self, d_model: int, num_heads: int, dropout_p: float = 0.0, bias: bool = True) -> None:
         super().__init__()
         self.d_model = d_model
-        self.n_heads = n_heads
-        self.head_dim = d_model // n_heads
+        self.num_heads = num_heads
+        self.head_dim = d_model // num_heads
         self.scale_factor = 1.0 / math.sqrt(self.head_dim)
 
         # QKV Projection Layers
@@ -56,8 +56,9 @@ class MultiHeadAttention(nn.Module):
         attn_weights = F.softmax(attn_scores, dim=3)
         attn_weights = self.dropout(attn_weights)
 
-        # Compute Attention Weights
-        return torch.matmul(attn_weights, v)
+        # Compute Attention Context
+        outputs = torch.matmul(attn_weights, v)
+        return outputs
         
     def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size, query_length, _ = q.size()
@@ -69,9 +70,9 @@ class MultiHeadAttention(nn.Module):
         v = self.v_proj(v)
 
         # Split heads
-        q = q.view([batch_size, query_length, self.n_heads, self.head_dim]).transpose(1, 2)
-        k = k.view([batch_size, cross_length, self.n_heads, self.head_dim]).transpose(1, 2)
-        v = v.view([batch_size, cross_length, self.n_heads, self.head_dim]).transpose(1, 2)
+        q = q.view([batch_size, query_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
+        k = k.view([batch_size, cross_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
+        v = v.view([batch_size, cross_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
 
         # Compute attention
         attn = self.scaled_dot_product_attention(q, k, v, attn_mask)
