@@ -1,8 +1,13 @@
 import torch
-
 from typing import Optional, Iterator
 
-def gradient_clipping(parameters: Iterator[torch.Tensor], clipping: bool = False, norm_type: int = 2, max_norm: int = 1, clipping_value: Optional[float] = None) -> torch.Tensor:
+def compute_gradient_norm(
+    parameters: Iterator[torch.Tensor],
+    clipping: bool = False,
+    norm_type: int = 2,
+    max_norm: int = 1,
+    clipping_value: Optional[float] = None
+) -> torch.Tensor:
     parameters = list(filter(lambda param: param.grad is not None, parameters))
     
     norm_type = float(norm_type)
@@ -23,11 +28,3 @@ def gradient_clipping(parameters: Iterator[torch.Tensor], clipping: bool = False
             torch.nn.utils.clip_grad.clip_grad_value_(parameters, clip_value=clipping_value)
 
     return total_norm
-
-def clip_gradient(parameters: Iterator[torch.Tensor], value: Optional[float] = None) -> None:
-    parameters = list(filter(lambda param: param.grad is not None, parameters))
-
-    if value is None:
-        torch.nn.utils.clip_grad.clip_grad_norm_(parameters, norm_type=2)
-    else:
-        torch.nn.utils.clip_grad.clip_grad_value_(parameters, clip_value=value)

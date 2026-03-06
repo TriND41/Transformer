@@ -2,70 +2,51 @@ import torch
 import torch.nn as nn
 from model.modules.encoder import Encoder
 from model.modules.decoder import Decoder
-from model.utils.masking import generate_padding_mask
 from typing import Optional
 
 class Transformer(nn.Module):
     def __init__(
         self,
-        n_encoder_tokens: int,
-        n_decoder_tokens: int,
-        n_encoder_blocks: int = 6,
-        n_decoder_blocks: int = 6,
+        num_encoder_tokens: int,
+        num_decoder_tokens: Optional[int] = None,
+        num_encoder_blocks: int = 6,
+        num_decoder_blocks: int = 6,
         d_model: int = 512,
-        n_heads: int = 8,
-        dropout_p: float = 0.1,
-        ffn_n_factors: int = 4,
-        attn_bias: bool = True,
-        ffn_bias: bool = True,
-        out_proj_bias: bool = True,
-        eps: float = 1e-5
+        num_heads: int = 8,
+        dropout_p: float = 0.0
     ) -> None:
         super().__init__()
+        if num_decoder_tokens is None:
+            self.share_embedding = True
+            self.embedding = nn.Embedding(num_encoder_tokens, d_model)
+        else:
+            self.share_embedding = False
+            self.encoder_embedding = nn.Embedding(num_encoder_tokens, d_model)
+            self.decoder_embedding = nn.Embedding(num_decoder_tokens, d_model)
+
         self.encoder = Encoder(
-            n_tokens=n_encoder_tokens,
-            n_blocks=n_encoder_blocks,
-            d_model=d_model,
-            n_heads=n_heads,
-            dropout_p=dropout_p,
-            ffn_n_factors=ffn_n_factors,
-            attn_bias=attn_bias,
-            ffn_bias=ffn_bias,
-            eps=eps
+            num_encoder_tokens, num_encoder_blocks,
+            d_model, num_heads, dropout_p
         )
         self.decoder = Decoder(
-            n_tokens=n_decoder_tokens,
-            n_blocks=n_decoder_blocks,
-            d_model=d_model,
-            n_heads=n_heads,
-            dropout_p=dropout_p,
-            ffn_n_factors=ffn_n_factors,
-            attn_bias=attn_bias,
-            ffn_bias=ffn_bias,
-            eps=eps
+            num_decoder_tokens, num_decoder_blocks,
+            d_model, num_heads, dropout_p
         )
-        self.proj = nn.Linear(in_features=d_model, out_features=n_decoder_tokens, bias=out_proj_bias)
 
     def forward(
         self,
         x: torch.Tensor,
         y: torch.Tensor,
-        x_lengths: Optional[torch.Tensor] = None,
-        y_lengths: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        x_mask: Optional[torch.Tensor] = None
+        x_mask: Optional[torch.Tensor] = None,
         y_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        if self.share_embedding:
+            x = self.embedding(x)
+            y = self.embedding(y)
+        else:
+            x = self.encoder_embedding(x)
+            y = self.decoder_embedding(y)
 
-        if x_lengths is not None:
-            x_mask = generate_padding_mask(x_lengths)
-
-        if y_lengths is not None:
-            y_mask = generate_padding_mask(y_lengths)
-
-        # Encoder Handling
         x = self.encoder(x, x_mask)
-        # Decoder Handling
-        y = self.decoder(y, x, x_mask, y_mask)
-        # Projection
-        y = self.proj(y)
+        y = self.decoder(y, x, y_mask, x_mask)
         return y

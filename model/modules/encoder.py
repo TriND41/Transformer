@@ -5,21 +5,29 @@ from model.utils.position import PositionalEncoding
 from typing import Optional, List, Tuple
 
 class Encoder(nn.Module):
-    def __init__(self, n_tokens: int, n_blocks: int, d_model: int, n_heads: int, dropout_p: float, ffn_n_factors: int = 4, attn_bias: bool = True, ffn_bias: bool = True, eps: float = 1e-5) -> None:
+    def __init__(
+        self,
+        num_blocks: int,
+        d_model: int,
+        num_heads: int,
+        dropout_p: float,
+        ffn_n_factors: int = 4,
+        attn_bias: bool = True,
+        ffn_bias: bool = True,
+        eps: float = 1e-5
+    ) -> None:
         super().__init__()
-        self.embedding = nn.Embedding(num_embeddings=n_tokens, embedding_dim=d_model)
         self.pe = PositionalEncoding(d_model)
         self.blocks = nn.ModuleList([
-            EncoderBlock(d_model, n_heads, dropout_p, ffn_n_factors, attn_bias, ffn_bias, eps)
-            for _ in range(n_blocks)
+            EncoderBlock(d_model, num_heads, dropout_p, ffn_n_factors, attn_bias, ffn_bias, eps)
+            for _ in range(num_blocks)
         ])
 
     def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[List[torch.Tensor]]]:
-        x = self.embedding(x)
         x += self.pe(x)
         
         if attn_mask is not None:
-            attn_mask.unsqueeze_(1).unsqueeze_(2).logical_not_()
+            attn_mask = attn_mask.unsqueeze(1).unsqueeze(2).logical_not()
         
         for block in self.blocks:
             x = block(x, attn_mask)
