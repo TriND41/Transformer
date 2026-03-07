@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 def get_eps(
     x: torch.Tensor,
@@ -59,10 +59,52 @@ class MultiHeadAttention(nn.Module):
         # Compute Attention Context
         outputs = torch.matmul(attn_weights, v)
         return outputs
+    
+    def get_kv_cache(self, k: torch.Tensor, v: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        batch_size, key_length, _ = k.size()
+
+        # Projection
+        k = self.k_proj(k)
+        v = self.v_proj(v)
+
+        # Split heads
+        k = k.view([batch_size, key_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
+        v = v.view([batch_size, key_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
+
+        return k, v
+    
+    def compute_attention_context(
+        self, 
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        attn_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        batch_size, query_length, _ = q.size()
+
+        attn = self.scaled_dot_product_attention(q, k, v, attn_mask)
+        attn = attn.transpose(1, 2).contiguous().view([batch_size, query_length, self.d_model])
+        attn = self.out_proj(attn)
+
+        return attn
+    
+    def forward_kv_cache(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        attn_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        batch_size, query_length, _ = q.size()
+        q = self.q_proj(q)
+        q = q.view([batch_size, query_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
+
+        attn = self.compute_attention_context(q, k, v, attn_mask)
+        return attn
         
     def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attn_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size, query_length, _ = q.size()
-        cross_length = k.size(1)
+        key_length = k.size(1)
         
         # QKV Projection
         q = self.q_proj(q)
@@ -71,12 +113,9 @@ class MultiHeadAttention(nn.Module):
 
         # Split heads
         q = q.view([batch_size, query_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
-        k = k.view([batch_size, cross_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
-        v = v.view([batch_size, cross_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
+        k = k.view([batch_size, key_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
+        v = v.view([batch_size, key_length, self.num_heads, self.head_dim]).transpose(1, 2).contiguous()
 
         # Compute attention
-        attn = self.scaled_dot_product_attention(q, k, v, attn_mask)
-        attn = attn.transpose(1, 2).contiguous().view([batch_size, query_length, self.d_model])
-        attn = self.out_proj(attn)
-
+        attn = self.compute_attention_context(q, k, v, attn_mask)
         return attn

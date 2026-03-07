@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from model.modules.encoder import Encoder
 from model.modules.decoder import Decoder
-from typing import Optional
+from typing import Optional, Tuple
 
 class Transformer(nn.Module):
     def __init__(
@@ -32,6 +32,33 @@ class Transformer(nn.Module):
             num_decoder_tokens, num_decoder_blocks,
             d_model, num_heads, dropout_p
         )
+
+    def extract_context(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor]) -> torch.Tensor:
+        x = self.encoder_embedding(x) if not self.share_embedding else self.embedding(x)
+        x = self.encoder(x, attn_mask)
+        return x
+    
+    def get_kv_caches(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        k_caches, v_caches = self.decoder.get_kv_caches(context)
+        return k_caches, v_caches
+    
+    def embed_token(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.decoder_embedding(x) if not self.share_embedding else self.embedding(x)
+        return x
+    
+    def decoding_step(
+        self,
+        x: torch.Tensor,
+        k_caches: torch.Tensor,
+        v_caches: torch.Tensor,
+        attn_mask: Optional[torch.Tensor] = None,
+        context_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        x = self.decoder.forward_kv_cache(
+            x, k_caches, v_caches,
+            attn_mask, context_mask
+        )
+        return x
 
     def forward(
         self,

@@ -2,13 +2,9 @@ import os
 import torch
 import torch.distributed as distributed
 from torch.nn import Module
-from torch.optim import Optimizer
-
-from utils.dictionaries import CheckpointKey
-from handlers.constants import CHECKPOINT_EXTENSION
-
 from collections import OrderedDict
 from typing import Dict, Union, Any
+from handlers.constants import EXTENSION
 
 def is_ddp_checkpoint(state_dict: OrderedDict):
     for key in state_dict.keys():
@@ -45,51 +41,36 @@ def load_checkpoint(path: str) -> Dict[str, Any]:
     return torch.load(path, map_location='cpu', weights_only=False)
 
 class CheckpointManager:
-    def __init__(self, saved_folder: str, n_savings: int = 3) -> None:
+    def __init__(self, saved_folder: str, num_savings: int = 3) -> None:
         if os.path.exists(saved_folder) == False:
             os.makedirs(saved_folder)
 
         self.saved_folder = saved_folder
-        self.n_savings = n_savings
+        self.num_savings = num_savings
+
         self.saved_checkpoints = []
 
-    def load_checkpoint(self, path: str) -> Dict[str, Any]:
-        return load_checkpoint(path)
+    def load_checkpoint(self, path: str) -> Dict:
+        return torch.load(path, map_location='cpu')
     
     def is_full_checkpoints(self) -> bool:
-        return len(self.saved_checkpoints) >= self.n_savings
+        if self.num_savings is not None:
+            return len(self.saved_checkpoints) >= self.num_savings
+        return False
     
     def remove_first(self) -> None:
-        os.remove(f"{self.saved_folder}/{self.saved_checkpoints[0]}.{CHECKPOINT_EXTENSION}")
+        os.remove(f"{self.saved_folder}/{self.saved_checkpoints[0]}.{EXTENSION}")
         self.saved_checkpoints.pop(0)
 
-    def __save_checkpoint(self, checkpoint: Dict[str, Any], iterations: int) -> None:
-        torch.save(checkpoint, f"{self.saved_folder}/{iterations}.{CHECKPOINT_EXTENSION}")
+    def __save_checkpoint(self, checkpoint: Dict, iterations: int) -> None:
+        torch.save(checkpoint, f"{self.saved_folder}/{iterations}.{EXTENSION}")
         self.saved_checkpoints.append(iterations)
 
-    def save_checkpoint(
-        self,
-        model: Module,
-        optimizer: Optimizer,
-        n_steps: int,
-        n_epochs: int,
-        model_config: Dict[str, Any],
-        processor_config: Dict[str, Any],
-        logging: bool = False
-    ) -> None:
-        checkpoint = {
-            CheckpointKey.MODEL: model.state_dict(),
-            CheckpointKey.OPTIMIZER: optimizer.state_dict(),
-            CheckpointKey.N_ITERATIONS: n_steps,
-            CheckpointKey.N_EPOCHS: n_epochs,
-            CheckpointKey.MODEL_CONFIG: model_config,
-            CheckpointKey.PROCESSOR_CONFIG: processor_config
-        }
-
+    def save_checkpoint(self, checkpoint: Dict[str, Any], num_epochs: int, num_steps: int, logging: bool = False) -> None:
         if self.is_full_checkpoints():
             self.remove_first()
 
-        self.__save_checkpoint(checkpoint, n_steps)
-
+        self.__save_checkpoint(checkpoint, num_steps)
+        
         if logging:
-            print(f"Saved Checkpoint at {self.saved_folder}/{n_steps}.{CHECKPOINT_EXTENSION} - Iteration {n_steps} - Epoch {n_epochs}")
+            print(f"Saved Checkpoint at {self.saved_folder}/{num_steps}.{EXTENSION} - Iteration {num_steps} - Epoch {num_epochs}")

@@ -4,5 +4,7 @@ class TransformerCheckpointKey:
     SCHEDULER = 'scheduler'
     HYPER_PARAMS = 'hyper_params'
     TEXT_PROCESSOR = 'text_processor'
+    ENCODER_TEXT_PROCESSOR = 'encoder_text_processor'
+    DECODER_TEXT_PROCESSOR = 'decoder_text_processor'
     ITERATION = 'iteration'
     EPOCH = 'epoch'

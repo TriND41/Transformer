@@ -9,7 +9,8 @@ class MachineTranslationDataset(Dataset):
     def __init__(
         self,
         manifest: str,
-        text_processor: TextProcessor,
+        source_text_processor: TextProcessor,
+        target_text_processor: Optional[TextProcessor] = None,
         num_examples: Optional[int] = None
     ) -> None:
         super().__init__()
@@ -17,15 +18,28 @@ class MachineTranslationDataset(Dataset):
         if num_examples is not None:
             self.table = self.table[:num_examples]
 
-        self.text_processor = text_processor
+        if target_text_processor is not None:
+            self.source_text_processor = source_text_processor
+            self.target_text_processor = target_text_processor
+            self.__shared_tokenizer = False
+        else:
+            self.text_processor = source_text_processor
+            self.__shared_tokenizer = True
 
     def __len__(self) -> int:
         return len(self.table)
     
-    def __getitem__(self, index: int) -> Tuple[str, str]:
+    def __getitem__(self, index: int) -> Tuple[np.ndarray, np.ndarray]:
         index_df = self.table.iloc[index]
 
-        src_text = index_df[ManifestKey.SOURCE]
-        targ_text = index_df[ManifestKey.TARGET]
+        source_text = index_df[ManifestKey.SOURCE]
+        target_text = index_df[ManifestKey.TARGET]
 
-        return src_text, targ_text
+        if not self.__shared_tokenizer:
+            source_tokens = self.source_text_processor.encode(source_text)
+            target_tokens = self.target_text_processor.encode(target_text)
+        else:
+            source_tokens = self.text_processor.encode(source_text)
+            target_tokens = self.text_processor.encode(target_text)
+
+        return source_tokens, target_tokens 
