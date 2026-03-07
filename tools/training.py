@@ -189,6 +189,18 @@ class Trainer:
             print("\nModel Summary:")
             torchsummary.summary(self.model)
 
+    def get_source_tokenizer(self) -> TextSentencePieceProcessor:
+        if self.__shared_tokenizer:
+            return self.text_processor
+        else:
+            return self.encoder_text_processor
+        
+    def get_target_tokenizer(self) -> Optional[TextSentencePieceProcessor]:
+        if self.__shared_tokenizer:
+            return None
+        else:
+            return self.decoder_text_processor
+
     def __load_weights(self, checkpoint: Dict[str, Any]) -> None:
         self.model.load_state_dict(checkpoint[CheckpointKey.MODEL])
         self.optimizer.load_state_dict(checkpoint[CheckpointKey.OPTIMIZER])
