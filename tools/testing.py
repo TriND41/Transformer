@@ -11,7 +11,7 @@ from tqdm import tqdm
 from typing import Union, Literal, Optional
 
 class Tester:
-    def __int__(
+    def __init__(
         self,
         checkpoint_path: str,
         searching: Literal['greedy', 'beam'] = 'greedy',
