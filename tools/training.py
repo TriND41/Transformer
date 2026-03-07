@@ -26,7 +26,7 @@ import handlers.gradient as gradient
 import numpy as np
 import torchsummary
 from tqdm import tqdm
-from typing import Literal, Union, Tuple, Optional, Dict, Any, List, Callable
+from typing import Literal, Tuple, Optional, Dict, Any, List, Callable
 
 def configure_dataloader(
     dataset: Dataset,
@@ -246,7 +246,7 @@ class Trainer:
         
         return ((source_token_sequences, source_token_lengths), (output_token_sequences, output_token_lengths)), target_token_sequences
     
-    def __generate_tokens(self, context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __generate_tokens(self, context: torch.Tensor, context_mask: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         k_caches, v_caches = self.model.get_kv_caches(context)
 
         # Initialize States
@@ -271,10 +271,65 @@ class Trainer:
                     token_embedding
                 ], dim=1).contiguous()
 
-            
+            # Get logits
+            logits = self.model.decoding_step(
+                token_embedding, k_caches, v_caches,
+                attn_mask, context_mask
+            )
+
+            tokens, completes, sum_logprobs = self.greedy_searching.decode(
+                tokens, logits.log_softmax(dim=1),
+                completes, sum_logprobs
+            )
+
+            attn_mask = torch.concatenate([attn_mask, completes.logical_not().unsqueeze(1)], dim=1).contiguous()
+
+            # Stop Criterion
+            num_steps += 1
+            if num_steps == max_decoder_steps:
+                break
+        
+        return tokens, sum_logprobs.exp()
     
     def __validate(self, dataloader: DataLoader, fp16: bool = False) -> None:
-        pass
+        self.model.eval()
+        val_loss = 0.0
+        val_bleu_score = 0.0
+        val_confident_score = 0.0
+
+        with torch.no_grad():
+            for ((inputs, input_lengths), (sequences, sequence_lengths)), targets in tqdm(dataloader, leave=False):
+                input_mask = generate_padding_mask(input_lengths)
+                sequence_mask = generate_padding_mask(sequence_lengths)
+
+                with torch.autocast(device_type='cuda', enabled=fp16):
+                    context = self.model.extract_context(inputs, input_mask)
+                    outputs = self.model.extract_logits(sequences, context, sequence_mask, input_mask)
+                    tokens, probabilities = self.__generate_tokens(context, input_mask)
+
+                    predictions = self.text_processor.batch_decode(tokens[:, 1:].cpu().numpy())
+                    labels = self.text_processor.batch_decode(targets.cpu().numpy())
+
+                    with torch.autocast(device_type='cuda', enabled=False):
+                        loss = self.criterion.cross_entropy_loss(outputs, targets, input_mask[:, 1:])
+                        bleu_score = self.metric.bleu_score(predictions, labels)
+
+            val_loss += loss
+            val_bleu_score += torch.tensor(bleu_score, dtype=torch.float, device=self.rank)
+            val_confident_score += probabilities.mean()
+
+        if self.rank == 0:
+            print(f"Validation Loss: {val_loss:.4f}")
+            print(f"Validation BLEU Score: {(val_bleu_score*100):.2f}%")
+            print("----------------------------------")
+            print(f"Validation Confident Score: {(val_confident_score*100):.2f}%")
+
+            if self.logger is not None:
+                self.logger.log({
+                    'val_loss': val_loss,
+                    'val_bleu_score': val_bleu_score,
+                    'val_confident_score': val_confident_score
+                }, self.num_steps)
 
     def train(
         self,
@@ -357,4 +412,9 @@ class Trainer:
                         'learning_rate': current_lr
                     }, self.num_steps)
 
-                
+            # Update learning rate
+            self.scheduler.step()
+
+            # Validation
+            if val_dataloader is not None:
+                self.__validate(val_dataloader, fp16=fp16)

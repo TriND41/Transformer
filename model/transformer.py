@@ -46,6 +46,17 @@ class Transformer(nn.Module):
         x = self.decoder_embedding(x) if not self.share_embedding else self.embedding(x)
         return x
     
+    def extract_logits(
+        self,
+        x: torch.Tensor,
+        context: torch.Tensor,
+        attn_mask: Optional[torch.Tensor] = None,
+        context_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        x = self.decoder_embedding(x) if not self.share_embedding else self.embedding(x)
+        x = self.decoder(x, context, attn_mask, context_mask)
+        return x
+    
     def decoding_step(
         self,
         x: torch.Tensor,
